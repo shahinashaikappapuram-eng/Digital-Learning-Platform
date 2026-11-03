@@ -1,0 +1,32 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5f8ff;
+  color: #14245c;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+}
+.logo {
+  width: 75px;
+  height: 75px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}

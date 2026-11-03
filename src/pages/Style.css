@@ -1,0 +1,541 @@
+/* ================================
+   RESET
+================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* ================================
+   PAGE
+================================ */
+
+body {
+    min-height: 100vh;
+    background: #f3f7ff;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    color: #12345b;
+}
+
+
+/* ================================
+   MAIN CONTAINER
+================================ */
+
+.page-container {
+    width: 100%;
+    max-width: 520px;
+
+    padding: 25px;
+
+    text-align: center;
+}
+
+
+/* ================================
+   WEBSITE TITLE
+================================ */
+
+.website-title {
+    font-size: 38px;
+    font-weight: 700;
+
+    color: #16467d;
+
+    margin-bottom: 8px;
+}
+
+.website-subtitle {
+    font-size: 20px;
+
+    color: #41648d;
+
+    margin-bottom: 32px;
+}
+
+
+/* ================================
+   LOGIN CARD
+================================ */
+
+.login-card {
+    width: 100%;
+
+    background: #ffffff;
+
+    border: 1px solid #d7e2f2;
+
+    border-radius: 24px;
+
+    padding: 40px 52px;
+
+    box-shadow:
+        0 15px 35px rgba(40, 80, 130, 0.10);
+
+    text-align: left;
+}
+
+
+/* ================================
+   WELCOME
+================================ */
+
+.welcome-title {
+    text-align: center;
+
+    color: #12437d;
+
+    font-size: 36px;
+    font-weight: 700;
+
+    margin-bottom: 10px;
+}
+
+.welcome-text {
+    text-align: center;
+
+    color: #496b94;
+
+    font-size: 18px;
+
+    margin-bottom: 32px;
+}
+
+
+/* ================================
+   FORM
+================================ */
+
+.form-group {
+    width: 100%;
+}
+
+.form-label {
+    display: block;
+
+    color: #111827;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    margin-bottom: 10px;
+}
+
+
+/* ================================
+   INPUT
+================================ */
+
+.input-wrapper {
+    position: relative;
+
+    width: 100%;
+}
+
+.input-field {
+    width: 100%;
+    height: 60px;
+
+    border: 1px solid #cbd9ed;
+
+    border-radius: 10px;
+
+    padding: 0 48px 0 60px;
+
+    font-size: 17px;
+
+    color: #243b5a;
+
+    outline: none;
+
+    background: #ffffff;
+
+    transition: 0.2s;
+}
+
+.input-field:focus {
+    border-color: #2b6de8;
+
+    box-shadow:
+        0 0 0 3px rgba(43, 109, 232, 0.10);
+}
+
+.input-field::placeholder {
+    color: #7b96b8;
+}
+
+
+/* ================================
+   INPUT ICON
+================================ */
+
+.input-icon {
+    position: absolute;
+
+    left: 21px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    font-size: 21px;
+
+    z-index: 2;
+}
+
+
+/* ================================
+   PASSWORD
+================================ */
+
+/*
+   This creates the gap between
+   Password box and Remember Me.
+*/
+
+.password-group {
+    margin-bottom: 22px;
+}
+
+
+/* ================================
+   PASSWORD EYE
+================================ */
+
+.password-toggle {
+    position: absolute;
+
+    right: 18px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    border: none;
+
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 19px;
+
+    padding: 5px;
+}
+
+
+/* ================================
+   REMEMBER ME + FORGOT PASSWORD
+================================ */
+
+.options-row {
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 25px;
+}
+
+
+/* Remember Me */
+
+.remember-container {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+.remember-container input {
+    width: 17px;
+    height: 17px;
+
+    cursor: pointer;
+
+    accent-color: #1769e8;
+}
+
+.remember-label {
+    font-size: 16px;
+
+    color: #243b5a;
+
+    cursor: pointer;
+
+    white-space: nowrap;
+}
+
+
+/* Forgot Password */
+
+.forgot-password {
+    border: none;
+
+    background: transparent;
+
+    color: #1769e8;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+    text-decoration: none;
+
+    white-space: nowrap;
+
+    margin-left: 20px;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+
+/* ================================
+   LOGIN BUTTON
+================================ */
+
+.login-button {
+    width: 100%;
+    height: 62px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: #2868df;
+
+    color: white;
+
+    font-size: 27px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    position: relative;
+
+    transition: 0.2s;
+}
+
+.login-button:hover {
+    background: #1e58c7;
+}
+
+.login-arrow {
+    position: absolute;
+
+    right: 20px;
+
+    font-size: 22px;
+}
+
+
+/* ================================
+   OR DIVIDER
+================================ */
+
+.divider {
+    display: flex;
+
+    align-items: center;
+
+    gap: 18px;
+
+    margin: 28px 0;
+}
+
+.divider-line {
+    flex: 1;
+
+    height: 1px;
+
+    background: #d4dfed;
+}
+
+.divider-text {
+    color: #123e72;
+
+    font-size: 18px;
+
+    font-weight: 700;
+}
+
+
+/* ================================
+   GOOGLE BUTTON
+================================ */
+
+.google-button {
+    width: 100%;
+    height: 60px;
+
+    border: 1px solid #cbd9ed;
+
+    border-radius: 10px;
+
+    background: white;
+
+    cursor: pointer;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 14px;
+
+    font-size: 17px;
+
+    font-weight: 700;
+
+    color: #172b4d;
+
+    transition: 0.2s;
+}
+
+.google-button:hover {
+    background: #f8faff;
+
+    border-color: #a9bfdf;
+}
+
+.google-icon {
+    font-size: 23px;
+
+    font-weight: 700;
+
+    color: #4285f4;
+}
+
+
+/* ================================
+   CREATE ACCOUNT
+================================ */
+
+.create-account-row {
+    text-align: center;
+
+    margin-top: 28px;
+
+    font-size: 16px;
+
+    color: #496b94;
+}
+
+.create-account-button {
+    border: none;
+
+    background: transparent;
+
+    color: #1769e8;
+
+    font-size: 16px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    margin-left: 7px;
+}
+
+.create-account-button:hover {
+    text-decoration: underline;
+}
+
+
+/* ================================
+   REMOVE OLD BOTTOM SYMBOLS
+================================ */
+
+/*
+   If your old HTML has a bottom section
+   containing the three symbols, this hides it.
+*/
+
+.bottom-icons,
+.bottom-images,
+.footer-icons,
+.extra-icons {
+    display: none !important;
+}
+
+
+/* ================================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 600px) {
+
+    .page-container {
+        padding: 18px;
+    }
+
+    .website-title {
+        font-size: 30px;
+    }
+
+    .website-subtitle {
+        font-size: 16px;
+
+        margin-bottom: 25px;
+    }
+
+    .login-card {
+        padding: 32px 25px;
+
+        border-radius: 20px;
+    }
+
+    .welcome-title {
+        font-size: 30px;
+    }
+
+    .welcome-text {
+        font-size: 16px;
+    }
+
+    .options-row {
+        gap: 15px;
+    }
+
+    .remember-label,
+    .forgot-password {
+        font-size: 14px;
+    }
+}
+
+
+/* ================================
+   SMALL MOBILE
+================================ */
+
+@media (max-width: 400px) {
+
+    .login-card {
+        padding: 28px 18px;
+    }
+
+    .options-row {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 12px;
+    }
+
+    .forgot-password {
+        margin-left: 25px;
+    }
+}
