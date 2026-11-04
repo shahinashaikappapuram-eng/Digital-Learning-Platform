@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from "react";
 import StudentSidebar from "../components/StudentSidebar";
 import { useNavigate } from "react-router-dom";
+import { gradeClass10MathAssignment } from "../utils/assignmentGrading";
+
+const splitClass10Answers = (answer = "") => {
+  const secondAnswerMarker = /(?:^|\n)\s*2[.)]\s*/i;
+  const match = secondAnswerMarker.exec(answer);
+  if (!match) {
+    return [answer.replace(/^\s*1[.)]\s*/i, ""), ""];
+  }
+
+  return [
+    answer.slice(0, match.index).replace(/^\s*1[.)]\s*/i, "").trim(),
+    answer.slice(match.index + match[0].length).trim(),
+  ];
+};
 
 export default function Assignments() {
   const navigate = useNavigate();
@@ -10,6 +24,7 @@ export default function Assignments() {
   const [user, setUser] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submissionText, setSubmissionText] = useState("");
+  const [class10Answers, setClass10Answers] = useState(["", ""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // SVG Renderer identical to Dashboard
@@ -595,22 +610,50 @@ export default function Assignments() {
     }
     try {
       const parsed = JSON.parse(rawUser);
-      setUser(parsed);
-
       const currentClass = String(parsed.class || "10");
+      const savedStatuses = parsed.assignmentStatuses || {};
+      const savedGrade = parsed.assignmentGrades?.["10-1"];
+      const shouldReopenOldMathSubmission =
+        currentClass === "10" &&
+        savedStatuses["10-1"] === "Submitted" &&
+        savedGrade?.autoGraded !== true;
+      const loadedUser = shouldReopenOldMathSubmission
+        ? {
+            ...parsed,
+            assignmentStatuses: {
+              ...savedStatuses,
+              "10-1": "Pending",
+            },
+          }
+        : parsed;
+
+      if (shouldReopenOldMathSubmission) {
+        localStorage.setItem("current_user", JSON.stringify(loadedUser));
+        const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
+        if (Array.isArray(allStudents)) {
+          localStorage.setItem(
+            "all_students",
+            JSON.stringify(allStudents.map((student) =>
+              student.id === loadedUser.id ? loadedUser : student
+            ))
+          );
+        }
+      }
+
+      setUser(loadedUser);
       const classSpecificAssignments = classAssignmentsMap[currentClass] || classAssignmentsMap["10"];
 
-      const savedStatuses = parsed.assignmentStatuses || {};
       const mergedList = classSpecificAssignments.map((item) => {
-        const userStatus = savedStatuses[item.id] || "Pending";
-        const grade = parsed.assignmentGrades?.[item.id] || null;
+        const userStatus = loadedUser.assignmentStatuses?.[item.id] || "Pending";
+        const grade = loadedUser.assignmentGrades?.[item.id] || null;
         return {
           ...item,
           status: userStatus,
           statusColor: grade ? "#1d4ed8" : userStatus === "Submitted" ? "#15803d" : "#d97706",
           statusBg: grade ? "#dbeafe" : userStatus === "Submitted" ? "#dcfce7" : "#fef3c7",
-          submittedOn: parsed.assignmentSubmissionDates?.[item.id] || null,
-          userAnswer: parsed.assignmentAnswers?.[item.id] || "",
+          submittedOn: loadedUser.assignmentSubmissionDates?.[item.id] || null,
+          userAnswer: loadedUser.assignmentAnswers?.[item.id] || "",
+          attempt: loadedUser.assignmentAttempts?.[item.id] || null,
           grade,
         };
       });
@@ -628,6 +671,14 @@ export default function Assignments() {
   const pendingCount = assignments.filter((a) => a.status === "Pending").length;
   const submittedCount = assignments.filter((a) => a.status === "Submitted").length;
   const overdueCount = assignments.filter((a) => a.status === "Overdue").length;
+  const assignmentMarks = Object.values(user.assignmentGrades || {}).reduce(
+    (total, grade) => total + (Number.isFinite(grade?.score) ? grade.score : 0),
+    0
+  );
+  const assignmentMaxMarks = Object.values(user.assignmentGrades || {}).reduce(
+    (total, grade) => total + (Number.isFinite(grade?.maxScore) ? grade.maxScore : 0),
+    0
+  );
 
   const filtered = assignments.filter((item) => {
     if (filter === "All") return true;
@@ -641,23 +692,89 @@ export default function Assignments() {
   };
 
   const handleSubmitAssignment = (assignmentId) => {
-    if (!submissionText.trim()) {
-      alert("Please enter your answer or notes before submitting.");
+    const isAutoGraded = assignmentId === "10-1";
+    const answers = isAutoGraded ? class10Answers.map((answer) => answer.trim()) : [];
+    if (isAutoGraded ? answers.some((answer) => !answer) : !submissionText.trim()) {
+      alert(isAutoGraded
+        ? "Please answer both questions before submitting."
+        : "Please enter your answer or notes before submitting.");
       return;
     }
 
+    const answerToSave = isAutoGraded
+      ? `1. ${answers[0]}\n2. ${answers[1]}`
+      : submissionText.trim();
+    const gradingResult = isAutoGraded ? gradeClass10MathAssignment(answers) : null;
     setIsSubmitting(true);
 
     setTimeout(() => {
+      const updatedAnswers = {
+        ...(user.assignmentAnswers || {}),
+        [assignmentId]: answerToSave,
+      };
+
+      if (isAutoGraded && !gradingResult.passed) {
+        const attempt = {
+          score: gradingResult.score,
+          maxScore: gradingResult.maxScore,
+          questionResults: gradingResult.questionResults,
+          attemptedOn: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        };
+        const updatedAttempts = {
+          ...(user.assignmentAttempts || {}),
+          [assignmentId]: attempt,
+        };
+        const updatedUser = {
+          ...user,
+          assignmentAnswers: updatedAnswers,
+          assignmentAttempts: updatedAttempts,
+        };
+
+        setUser(updatedUser);
+        localStorage.setItem("current_user", JSON.stringify(updatedUser));
+        const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
+        if (Array.isArray(allStudents)) {
+          localStorage.setItem(
+            "all_students",
+            JSON.stringify(allStudents.map((student) =>
+              student.id === user.id ? updatedUser : student
+            ))
+          );
+        }
+        setAssignments((previous) => previous.map((assignment) =>
+          assignment.id === assignmentId
+            ? { ...assignment, userAnswer: answerToSave, attempt }
+            : assignment
+        ));
+        setSelectedAssignment((previous) =>
+          previous ? { ...previous, userAnswer: answerToSave, attempt } : previous
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       const updatedStatuses = {
         ...(user.assignmentStatuses || {}),
         [assignmentId]: "Submitted"
       };
-
-      const updatedAnswers = {
-        ...(user.assignmentAnswers || {}),
-        [assignmentId]: submissionText
-      };
+      const updatedGrades = isAutoGraded
+        ? {
+            ...(user.assignmentGrades || {}),
+            [assignmentId]: {
+              score: gradingResult.score,
+              maxScore: gradingResult.maxScore,
+              feedback: "All answers are correct.",
+              gradedAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+              autoGraded: true,
+            },
+          }
+        : user.assignmentGrades || {};
+      const updatedAttempts = { ...(user.assignmentAttempts || {}) };
+      delete updatedAttempts[assignmentId];
+      const updatedAssignmentMarks = Object.values(updatedGrades).reduce(
+        (total, grade) => total + (Number.isFinite(grade?.score) ? grade.score : 0),
+        0
+      );
 
       const updatedDates = {
         ...(user.assignmentSubmissionDates || {}),
@@ -679,8 +796,11 @@ export default function Assignments() {
         assignmentAnswers: updatedAnswers,
         assignmentSubmissionDates: updatedDates,
         assignmentSubmissionDetails: updatedDetails,
+        assignmentGrades: updatedGrades,
+        assignmentAttempts: updatedAttempts,
+        assignmentScoreTotal: updatedAssignmentMarks,
         assignmentsCompleted: `${newlySubmittedCount}/${assignments.length}`,
-        overallProgress: Math.min(100, (user.overallProgress || 0) + 10),
+        overallProgress: Math.min(100, (user.overallProgress || 0) + (isAutoGraded ? 10 : 0)),
         recentActivities: [
           {
             id: `act-assign-${Date.now()}`,
@@ -691,8 +811,12 @@ export default function Assignments() {
             color: "#16A34A",
             matter: {
               heading: `${selectedAssignment.subject} Assignment`,
-              summary: `You submitted ${selectedAssignment.title}. Teacher will review shortly.`,
-              score: "Status: Submitted (Pending Review)",
+              summary: isAutoGraded
+                ? `You answered ${selectedAssignment.title} correctly.`
+                : `You submitted ${selectedAssignment.title}. Teacher will review shortly.`,
+              score: isAutoGraded
+                ? `Score: ${gradingResult.score}/${gradingResult.maxScore} marks`
+                : "Status: Submitted (Pending Review)",
               actionPath: "/assignments",
               actionText: "View Submissions"
             }
@@ -717,8 +841,9 @@ export default function Assignments() {
                 statusColor: "#15803d",
                 statusBg: "#dcfce7",
                 submittedOn: updatedDates[assignmentId],
-                userAnswer: submissionText,
-                grade: null,
+                userAnswer: answerToSave,
+                attempt: null,
+                grade: updatedGrades[assignmentId] || null,
               }
             : a
         )
@@ -727,6 +852,7 @@ export default function Assignments() {
       setIsSubmitting(false);
       setSelectedAssignment(null);
       setSubmissionText("");
+      setClass10Answers(["", ""]);
     }, 500);
   };
 
@@ -847,6 +973,10 @@ export default function Assignments() {
                 <small>Total Assignments</small>
                 <strong>{assignments.length} Assigned</strong>
               </div>
+              <div>
+                <small>Marks Earned</small>
+                <strong>{assignmentMarks}/{assignmentMaxMarks}</strong>
+              </div>
               <span style={{ fontSize: 24, marginLeft: 6 }}>📝</span>
             </div>
           </div>
@@ -887,11 +1017,21 @@ export default function Assignments() {
                   <span className="as-badge" style={{ background: item.statusBg, color: item.statusColor }}>
                     {item.status}
                   </span>
+                  {Number.isFinite(item.grade?.score) && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
+                      Marks: {item.grade.score}/{item.grade.maxScore}
+                    </span>
+                  )}
                   <button
                     className="as-details-btn"
                     onClick={() => {
                       setSelectedAssignment(item);
-                      setSubmissionText(item.userAnswer || "");
+                      setSubmissionText(item.id === "10-1" ? "" : item.userAnswer || "");
+                      setClass10Answers(
+                        item.id === "10-1" && item.attempt
+                          ? splitClass10Answers(item.userAnswer)
+                          : ["", ""]
+                      );
                     }}
                   >
                     View Details ›
@@ -948,7 +1088,16 @@ export default function Assignments() {
                   </p>
                   {selectedAssignment.grade && (
                     <div style={{ borderTop: "1px solid #86EFAC", marginTop: 8, paddingTop: 8 }}>
-                      <strong style={{ fontSize: 12, color: "#1D4ED8" }}>Teacher feedback: {selectedAssignment.grade.feedback}</strong>
+                      <strong style={{ fontSize: 12, color: "#1D4ED8" }}>
+                        {Number.isFinite(selectedAssignment.grade.score)
+                          ? `Marks: ${selectedAssignment.grade.score}/${selectedAssignment.grade.maxScore}`
+                          : `Teacher feedback: ${selectedAssignment.grade.feedback}`}
+                      </strong>
+                      {selectedAssignment.grade.feedback && (
+                        <p style={{ fontSize: 11, color: "#1E40AF", marginTop: 4 }}>
+                          {selectedAssignment.grade.feedback}
+                        </p>
+                      )}
                       <p style={{ fontSize: 11, color: "#1E40AF", marginTop: 4 }}>
                         Graded {selectedAssignment.grade.gradedAt || ""}
                       </p>
@@ -957,15 +1106,54 @@ export default function Assignments() {
                 </div>
               ) : (
                 <div>
-                  <strong style={{ fontSize: 12, color: "#0F172A", display: "block", marginBottom: 6 }}>
-                    Your Solution / Answer:
-                  </strong>
-                  <textarea
-                    className="as-textarea"
-                    placeholder="Type your assignment answers, steps, or explanation here..."
-                    value={submissionText}
-                    onChange={(e) => setSubmissionText(e.target.value)}
-                  />
+                  {selectedAssignment.attempt && (
+                    <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", padding: "12px 14px", borderRadius: 10, color: "#B91C1C" }}>
+                      <strong style={{ fontSize: 12, display: "block", marginBottom: 5 }}>
+                        Not accepted — no marks recorded ({selectedAssignment.attempt.score}/{selectedAssignment.attempt.maxScore})
+                      </strong>
+                      <p style={{ fontSize: 11.5, marginBottom: 5 }}>
+                        Correct all answers to earn marks. You can try again.
+                      </p>
+                      {selectedAssignment.attempt.questionResults.map((correct, index) => (
+                        <p key={index} style={{ fontSize: 11.5 }}>
+                          Question {index + 1}: {correct ? "Correct" : "Incorrect"}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {selectedAssignment.id === "10-1" ? (
+                    selectedAssignment.questions.map((question, index) => (
+                      <div key={question} style={{ marginTop: 10 }}>
+                        <strong style={{ fontSize: 12, color: "#0F172A", display: "block", marginBottom: 6 }}>
+                          {question}
+                        </strong>
+                        <textarea
+                          className="as-textarea"
+                          placeholder={index === 0
+                            ? "Write the proof, including the contradiction..."
+                            : "Enter the evaluated value (for example, 1)..."}
+                          value={class10Answers[index]}
+                          onChange={(event) => setClass10Answers((previous) =>
+                            previous.map((answer, answerIndex) =>
+                              answerIndex === index ? event.target.value : answer
+                            )
+                          )}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div>
+                      <strong style={{ fontSize: 12, color: "#0F172A", display: "block", marginBottom: 6 }}>
+                        Your Solution / Answer:
+                      </strong>
+                      <textarea
+                        className="as-textarea"
+                        placeholder="Type your assignment answers, steps, or explanation here..."
+                        value={submissionText}
+                        onChange={(e) => setSubmissionText(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -984,7 +1172,11 @@ export default function Assignments() {
                     onClick={() => handleSubmitAssignment(selectedAssignment.id)}
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Submitting..." : "Submit Assignment Now ✓"}
+                    {isSubmitting
+                      ? "Checking..."
+                      : selectedAssignment.id === "10-1"
+                        ? "Check Answers & Submit ✓"
+                        : "Submit Assignment Now ✓"}
                   </button>
                 )}
               </div>

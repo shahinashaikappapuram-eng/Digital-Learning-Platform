@@ -71,6 +71,7 @@ export default function TeacherAssignments() {
       }
 
       const grade = {
+        ...(student.assignmentGrades?.[submission.assignmentId] || {}),
         feedback: gradeMsg.trim(),
         gradedAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         gradedBy: teacher.id,

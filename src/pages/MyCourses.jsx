@@ -1217,7 +1217,9 @@ export default function MyCourses() {
 
   const handleMarkLessonCompleted = (courseId, courseTitle) => {
     const courseProgressMap = user.courseProgressMap || {};
-    const currentProg = courseProgressMap[courseId] || 0;
+    const currentProg = Number(courseProgressMap[courseId]) || 0;
+    if (currentProg >= 100) return;
+
     const newProg = Math.min(100, currentProg + 25);
     const updatedMap = { ...courseProgressMap, [courseId]: newProg };
 
@@ -1246,6 +1248,15 @@ export default function MyCourses() {
 
     setUser(updatedUser);
     localStorage.setItem("current_user", JSON.stringify(updatedUser));
+    const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
+    if (Array.isArray(allStudents)) {
+      localStorage.setItem(
+        "all_students",
+        JSON.stringify(allStudents.map((student) =>
+          student.id === user.id ? updatedUser : student
+        ))
+      );
+    }
   };
 
   const handleLogout = () => {
@@ -1730,10 +1741,14 @@ export default function MyCourses() {
                       <span>Find Lessons</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleMarkLessonCompleted(activeHighlightedCourse.id, activeHighlightedCourse.title)}
+                      disabled={activeHighlightedCourse.progress >= 100}
                       style={{ background: "#DCFCE7", color: "#15803D", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                     >
-                      ✓ Mark Completed (+25%)
+                      {activeHighlightedCourse.progress >= 100
+                        ? "✓ Course Completed"
+                        : "✓ Mark Completed (+25%)"}
                     </button>
                   </div>
                 </div>

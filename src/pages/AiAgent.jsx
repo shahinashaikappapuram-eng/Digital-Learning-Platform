@@ -1,16 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import StudentSidebar from "../components/StudentSidebar";
 import { useNavigate } from "react-router-dom";
 import { requestAiTutorAnswer } from "../utils/aiTutor";
+import {
+  getTutorAttachmentError,
+  TUTOR_ATTACHMENT_ACCEPT,
+} from "../utils/tutorAttachments";
 
 export default function AiAgent() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [queryInput, setQueryInput] = useState("");
+  const [attachment, setAttachment] = useState(null);
+  const [attachmentError, setAttachmentError] = useState("");
+  const attachmentInputRef = useRef(null);
+  const attachedFilesRef = useRef(new Map());
+  const speechRecognitionRef = useRef(null);
   const [activeConversation, setActiveConversation] = useState(null);
   const [showAllModal, setShowAllModal] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+
+  useEffect(() => () => {
+    speechRecognitionRef.current?.stop();
+  }, []);
 
   const renderSvgIcon = (name, size = 18, stroke = "currentColor") => {
     switch (name) {
@@ -203,31 +218,39 @@ export default function AiAgent() {
     setActiveConversation(entry);
   };
 
-  const askAiAgent = async (question, subject = "General", topic = {}, existingConversation = null) => {
+  const askAiAgent = async (question, subject = "General", topic = {}, existingConversation = null, attachedFile = null) => {
     const trimmedQuestion = question.trim();
-    if (!trimmedQuestion || isSubmitting) return;
+    if ((!trimmedQuestion && !attachedFile) || isSubmitting) return;
+    if (attachmentError && !attachedFile) return;
+    const effectiveQuestion = trimmedQuestion || "Please help me understand the attached file.";
 
     setIsSubmitting(true);
     const conversation = existingConversation
       ? { ...existingConversation, isLoading: true, error: null }
       : {
           id: `conv-${Date.now()}`,
-          title: topic.title || (trimmedQuestion.length > 35 ? `${trimmedQuestion.substring(0, 35)}...` : trimmedQuestion),
+          title: topic.title || (effectiveQuestion.length > 35 ? `${effectiveQuestion.substring(0, 35)}...` : effectiveQuestion),
           subject,
           time: "Just now",
           icon: topic.icon || "🤖",
           iconBg: topic.iconBg || "#2563eb",
-          chat: [{ sender: "Student", text: trimmedQuestion }],
+          chat: [{
+            sender: "Student",
+            text: effectiveQuestion,
+            attachment: attachedFile ? { name: attachedFile.name, type: attachedFile.type } : null,
+          }],
           isLoading: true,
           error: null,
         };
+    if (attachedFile) attachedFilesRef.current.set(conversation.id, attachedFile);
     saveConversationEntry(conversation);
 
     try {
       const answer = await requestAiTutorAnswer({
         subject,
-        question: trimmedQuestion,
+        question: effectiveQuestion,
         classLevel: String(user.class || ""),
+        attachment: attachedFile,
       });
       saveConversationEntry({
         ...conversation,
@@ -258,9 +281,73 @@ export default function AiAgent() {
   const handleSendQuestion = (e) => {
     if (e) e.preventDefault();
     const q = queryInput.trim();
-    if (!q) return;
+    if ((!q && !attachment) || attachmentError) return;
     setQueryInput("");
-    askAiAgent(q);
+    askAiAgent(q, "General", {}, null, attachment);
+    setAttachment(null);
+    setAttachmentError("");
+    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+  };
+
+  const handleAttachmentChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    const error = getTutorAttachmentError(file);
+    setAttachmentError(error);
+    setAttachment(error ? null : file);
+    if (error) event.target.value = "";
+  };
+
+  const handleVoiceInput = () => {
+    if (isListening) {
+      speechRecognitionRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError("Voice input is not supported in this browser. Type your question instead.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setVoiceError("Voice input requires a secure connection (HTTPS or localhost).");
+      return;
+    }
+
+    setVoiceError("");
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ")
+        .trim();
+      if (transcript) {
+        setQueryInput((previous) => `${previous}${previous.trim() ? " " : ""}${transcript}`);
+      }
+    };
+    recognition.onerror = (event) => {
+      const errorMessages = {
+        "not-allowed": "Microphone access was blocked. Allow microphone access in your browser settings.",
+        "service-not-allowed": "Microphone access was blocked. Allow microphone access in your browser settings.",
+        "no-speech": "No speech was detected. Try again and speak near your microphone.",
+        "audio-capture": "No microphone was found. Connect a microphone and try again.",
+        network: "Voice recognition is unavailable because of a network error.",
+      };
+      setVoiceError(errorMessages[event.error] || "Voice input failed. Please try again or type your question.");
+      setIsListening(false);
+    };
+    recognition.onend = () => setIsListening(false);
+    speechRecognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      setIsListening(false);
+      setVoiceError("Voice input could not start. Please try again.");
+    }
   };
 
   const handleLogout = () => {
@@ -425,6 +512,7 @@ export default function AiAgent() {
             </div>
           </div>
 
+          <div>
           <form className="ai-search-bar" onSubmit={handleSendQuestion}>
             <input
               type="text"
@@ -434,14 +522,83 @@ export default function AiAgent() {
               disabled={isSubmitting}
             />
             <div className="ai-bar-tools">
-              <span title="Attach File" style={{ cursor: "pointer" }}>📎</span>
-              <span title="Insert Image" style={{ cursor: "pointer" }}>🖼️</span>
-              <span title="Voice Question" style={{ cursor: "pointer" }}>🎤</span>
+              <input
+                ref={attachmentInputRef}
+                id="ai-agent-attachment"
+                type="file"
+                accept={TUTOR_ATTACHMENT_ACCEPT}
+                onChange={handleAttachmentChange}
+                disabled={isSubmitting}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                title="Attach JPEG, PNG, or PDF (max 5 MB)"
+                aria-label="Attach a file"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={isSubmitting}
+                style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 16 }}
+              >
+                📎
+              </button>
+              <button
+                type="button"
+                title="Attach an image"
+                aria-label="Attach an image"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={isSubmitting}
+                style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 16 }}
+              >
+                🖼️
+              </button>
+              <button
+                type="button"
+                title={isListening ? "Stop voice input" : "Speak your question"}
+                aria-label={isListening ? "Stop voice input" : "Speak your question"}
+                aria-pressed={isListening}
+                onClick={handleVoiceInput}
+                disabled={isSubmitting}
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontSize: 16,
+                  color: isListening ? "#dc2626" : "inherit",
+                }}
+              >
+                {isListening ? "⏹️" : "🎤"}
+              </button>
             </div>
-            <button type="submit" className="ai-send-btn" title="Send Question" disabled={isSubmitting}>
+            <button type="submit" className="ai-send-btn" title="Send Question" disabled={isSubmitting || Boolean(attachmentError)}>
               {isSubmitting ? "…" : "➤"}
             </button>
           </form>
+          {voiceError && (
+            <p role="alert" style={{ padding: "8px 12px", color: "#b91c1c", fontSize: 12 }}>
+              {voiceError}
+            </p>
+          )}
+          {(attachment || attachmentError) && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", color: attachmentError ? "#b91c1c" : "#334155", fontSize: 12 }}>
+              <span role={attachmentError ? "alert" : undefined}>
+                {attachmentError || `Attached: ${attachment.name}`}
+              </span>
+              {attachment && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachment(null);
+                    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+                  }}
+                  disabled={isSubmitting}
+                  style={{ border: 0, background: "transparent", color: "#b91c1c", cursor: "pointer" }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
+          </div>
 
           <div className="ai-conv-box">
             <div className="ai-conv-header">
@@ -525,6 +682,11 @@ export default function AiAgent() {
                     {msg.sender === "Student" ? `${studentName} (You)` : "🤖 AI Agent"}
                   </strong>
                   <div>{msg.text}</div>
+                  {msg.attachment && (
+                    <small style={{ display: "block", marginTop: 6, color: "#64748b" }}>
+                      📎 {msg.attachment.name}
+                    </small>
+                  )}
                 </div>
               ))}
               {activeConversation.isLoading && (
@@ -540,7 +702,8 @@ export default function AiAgent() {
                       activeConversation.chat.find((message) => message.sender === "Student")?.text || "",
                       activeConversation.subject,
                       {},
-                      activeConversation
+                      activeConversation,
+                      attachedFilesRef.current.get(activeConversation.id) || null
                     )}
                     style={{ marginTop: 8, color: "#1d4ed8", border: 0, background: "transparent", fontWeight: 700, cursor: "pointer" }}
                   >

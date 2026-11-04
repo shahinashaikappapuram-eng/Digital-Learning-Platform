@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { Buffer } from "node:buffer";
 import process from "node:process";
 
 const port = Number(process.env.API_PORT || 3001);
@@ -6,6 +7,9 @@ const model = "gemini-3.5-flash-lite";
 const requestWindowMs = 60_000;
 const maxRequestsPerWindow = 10;
 const maxQuestionLength = 2000;
+const maxAttachmentBytes = 5 * 1024 * 1024;
+const maxRequestBodyLength = 8 * 1024 * 1024;
+const allowedAttachmentTypes = new Set(["image/jpeg", "image/png", "application/pdf"]);
 const requestsByAddress = new Map();
 const getGeminiApiKey = () => {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -36,9 +40,9 @@ const readJsonBody = (request) =>
     request.on("data", (chunk) => {
       if (settled) return;
       body += chunk;
-      if (body.length > maxQuestionLength + 500) {
+      if (body.length > maxRequestBodyLength) {
         settled = true;
-        reject(new Error("Request body is too large."));
+        reject(new Error("Request body is too large. Attach a file no larger than 5 MB."));
         request.resume();
       }
     });
@@ -128,6 +132,43 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  const contentsParts = [{
+    text: `Subject: ${subject}${classLevel ? `\nStudent class: ${classLevel}` : ""}\nQuestion: ${question}`,
+  }];
+  if (payload.attachment !== undefined) {
+    const attachment = payload.attachment;
+    if (
+      !attachment ||
+      typeof attachment !== "object" ||
+      Array.isArray(attachment) ||
+      typeof attachment.mimeType !== "string" ||
+      !allowedAttachmentTypes.has(attachment.mimeType) ||
+      typeof attachment.dataBase64 !== "string" ||
+      attachment.dataBase64.length === 0 ||
+      attachment.dataBase64.length > Math.ceil(maxAttachmentBytes / 3) * 4 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(attachment.dataBase64)
+    ) {
+      sendJson(response, 400, { error: "Attach a valid JPEG, PNG, or PDF file no larger than 5 MB." });
+      return;
+    }
+
+    const fileBytes = Buffer.from(attachment.dataBase64, "base64");
+    if (
+      fileBytes.length === 0 ||
+      fileBytes.length > maxAttachmentBytes ||
+      fileBytes.toString("base64") !== attachment.dataBase64
+    ) {
+      sendJson(response, 400, { error: "Attach a valid JPEG, PNG, or PDF file no larger than 5 MB." });
+      return;
+    }
+    contentsParts.push({
+      inlineData: {
+        mimeType: attachment.mimeType,
+        data: attachment.dataBase64,
+      },
+    });
+  }
+
   try {
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -140,14 +181,12 @@ const server = createServer(async (request, response) => {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are a careful school tutor. Directly answer the student's specific question in clear, age-appropriate language. Explain reasoning step by step when useful. If the question is unclear, ask a clarifying question. Never replace an answer with generic study advice, invent facts, or claim certainty when uncertain; state uncertainty and encourage checking with their teacher when appropriate.",
+              text: "You are a careful school tutor. Directly answer the student's specific question in clear, age-appropriate language. When the student attached an image or PDF, inspect its contents and use them to answer the question. Explain reasoning step by step when useful. If the question is unclear, ask a clarifying question. Never replace an answer with generic study advice, invent facts, or claim certainty when uncertain; state uncertainty and encourage checking with their teacher when appropriate.",
             }],
           },
           contents: [{
             role: "user",
-            parts: [{
-              text: `Subject: ${subject}${classLevel ? `\nStudent class: ${classLevel}` : ""}\nQuestion: ${question}`,
-            }],
+            parts: contentsParts,
           }],
           generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
         }),

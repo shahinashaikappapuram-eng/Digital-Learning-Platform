@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentSidebar from "../components/StudentSidebar";
 import TeacherSidebar from "../components/TeacherSidebar";
 import { requestAiTutorAnswer } from "../utils/aiTutor";
+import {
+  getTutorAttachmentError,
+  TUTOR_ATTACHMENT_ACCEPT,
+} from "../utils/tutorAttachments";
 
 const clearPlaceholderAnswers = (account) => {
   if (!Array.isArray(account.doubtsList)) return { account, changed: false };
@@ -22,12 +26,16 @@ const clearPlaceholderAnswers = (account) => {
 
 export default function DoubtCentre() {
   const navigate = useNavigate();
+  const doubtAttachmentsRef = useRef(new Map());
 
   const [user, setUser] = useState(null);
   const [isTeacher, setIsTeacher] = useState(false);
 
   const [selectedSubject, setSelectedSubject] = useState("Mathematics");
   const [doubtText, setDoubtText] = useState("");
+  const [attachment, setAttachment] = useState(null);
+  const [attachmentError, setAttachmentError] = useState("");
+  const attachmentInputRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
   const [aiServiceStatus, setAiServiceStatus] = useState("checking");
@@ -159,6 +167,11 @@ export default function DoubtCentre() {
 
   const handleRetryAnswer = async (doubt) => {
     if (isSubmitting) return;
+    const attachedFile = doubtAttachmentsRef.current.get(doubt.id) || null;
+    if (doubt.attachment?.name && !attachedFile) {
+      setSubmissionError("This doubt included a file that is no longer available. Attach the file again and submit the doubt again.");
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmissionError("");
@@ -167,8 +180,10 @@ export default function DoubtCentre() {
         subject: doubt.subject,
         question: doubt.text,
         classLevel: String(user.class || ""),
+        attachment: attachedFile,
       });
       applyAiAnswer(doubt.id, answer);
+      doubtAttachmentsRef.current.delete(doubt.id);
     } catch (error) {
       setSubmissionError(`Your doubt is still pending. ${error.message}`);
     } finally {
@@ -258,47 +273,66 @@ export default function DoubtCentre() {
 
   const handleAskDoubt = async (e) => {
     e.preventDefault();
-    if (!doubtText.trim()) {
-      setSubmissionError("Please describe your doubt clearly.");
+    if (!doubtText.trim() && !attachment) {
+      setSubmissionError("Describe your doubt or attach a file.");
+      return;
+    }
+    if (attachmentError) {
       return;
     }
 
     setIsSubmitting(true);
     setSubmissionError("");
+    const currentText = doubtText.trim() || "Please help me understand the attached file.";
     const doubtId = `dbt-${crypto.randomUUID()}`;
     const newDoubt = {
       id: doubtId,
       subject: selectedSubject,
-      text: doubtText.trim(),
+      text: currentText,
+      attachment: attachment ? { name: attachment.name, type: attachment.type } : null,
       date: "Just now",
       status: "Pending",
       teacherResponse: null
     };
+    if (attachment) doubtAttachmentsRef.current.set(doubtId, attachment);
 
     const updatedDoubts = [newDoubt, ...userDoubts];
     let updatedUser;
     try {
       updatedUser = persistUserDoubts(updatedDoubts);
     } catch (error) {
+      doubtAttachmentsRef.current.delete(doubtId);
       setIsSubmitting(false);
       setSubmissionError(error.message || "Unable to save your doubt. Please try again.");
       return;
     }
 
-    const currentText = doubtText.trim();
     setDoubtText("");
     try {
       const answer = await requestAiTutorAnswer({
         subject: newDoubt.subject,
         question: currentText,
         classLevel: String(user.class || ""),
+        attachment,
       });
       applyAiAnswer(doubtId, answer, updatedUser);
+      doubtAttachmentsRef.current.delete(doubtId);
     } catch (error) {
       setSubmissionError(`Your doubt was saved as pending. ${error.message}`);
     } finally {
+      setAttachment(null);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
       setIsSubmitting(false);
     }
+  };
+
+  const handleAttachmentChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    const error = getTutorAttachmentError(file);
+    setAttachmentError(error);
+    setSubmissionError("");
+    setAttachment(error ? null : file);
+    if (error) event.target.value = "";
   };
 
   const filteredMyDoubts = userDoubts.filter((d) => {
@@ -358,7 +392,7 @@ export default function DoubtCentre() {
         .dc-label { font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 6px; }
         .dc-select { width: 100%; padding: 10px 14px; border-radius: 9px; border: 1px solid #cbd5e1; outline: none; font-size: 13px; margin-bottom: 14px; background: #fff; }
         .dc-textarea { width: 100%; height: 115px; border-radius: 9px; border: 1px solid #cbd5e1; padding: 12px; outline: none; font-size: 13px; font-family: inherit; resize: vertical; margin-bottom: 14px; }
-        .dc-file-box { border: 1.5px dashed #cbd5e1; border-radius: 9px; padding: 12px; text-align: center; font-size: 12px; color: #64748b; margin-bottom: 14px; cursor: pointer; background: #f8fafc; }
+        .dc-file-box { border: 1.5px dashed #cbd5e1; border-radius: 9px; padding: 12px; text-align: center; font-size: 12px; color: #64748b; margin-bottom: 14px; cursor: pointer; background: #f8fafc; display: block; }
         .dc-submit-btn { width: 100%; background: ${isTeacher ? "#059669" : "#2563eb"}; color: #fff; border: none; padding: 12px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
         .dc-submit-btn:hover { background: ${isTeacher ? "#047857" : "#1d4ed8"}; }
         .dc-form-error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 12px; font-size: 12px; margin-bottom: 12px; line-height: 1.5; }
@@ -522,14 +556,39 @@ export default function DoubtCentre() {
                   value={doubtText}
                   onChange={(e) => setDoubtText(e.target.value)}
                   maxLength={2000}
-                  required
                 ></textarea>
 
-                <div className="dc-file-box" onClick={() => alert("File attachment ready. You can attach JPEG/PNG/PDF.")}>
-                  📎 Attach Image / File (Optional - Max 5MB)
-                </div>
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  accept={TUTOR_ATTACHMENT_ACCEPT}
+                  onChange={handleAttachmentChange}
+                  disabled={isSubmitting}
+                  style={{ display: "none" }}
+                  id="doubt-attachment"
+                />
+                <label className="dc-file-box" htmlFor="doubt-attachment">
+                  📎 {attachment ? "Change attached file" : "Attach Image / File (Optional - Max 5MB)"}
+                </label>
+                {attachment && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: -8, marginBottom: 12, fontSize: 12, color: "#334155" }}>
+                    <span>Attached: {attachment.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachment(null);
+                        if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+                      }}
+                      disabled={isSubmitting}
+                      style={{ border: 0, background: "transparent", color: "#b91c1c", cursor: "pointer" }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+                {attachmentError && <div className="dc-form-error" role="alert">{attachmentError}</div>}
 
-                <button type="submit" className="dc-submit-btn" disabled={isSubmitting}>
+                <button type="submit" className="dc-submit-btn" disabled={isSubmitting || Boolean(attachmentError)}>
                   {isSubmitting ? "Getting AI answer..." : "Ask Gemini AI"}
                 </button>
               </form>
@@ -614,6 +673,11 @@ export default function DoubtCentre() {
                       <div>
                         <strong style={{ fontSize: 13, color: "#0F172A", display: "block" }}>{item.text}</strong>
                         <span style={{ fontSize: 11, color: "#64748B" }}>{item.subject} • {item.date}</span>
+                        {item.attachment?.name && (
+                          <span style={{ fontSize: 11, color: "#475569", display: "block" }}>
+                            📎 {item.attachment.name}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -692,6 +756,11 @@ export default function DoubtCentre() {
                 <span style={{ fontSize: 11, color: isTeacher ? "#059669" : "#2563eb", fontWeight: 700 }}>{selectedResponseDetail.subject}</span>
                 <h4 style={{ fontSize: 14, fontWeight: 700, marginTop: 4, color: "#0f172a" }}>"{selectedResponseDetail.text}"</h4>
                 <small style={{ fontSize: 10.5, color: "#94a3b8" }}>Posted {selectedResponseDetail.date}</small>
+                {selectedResponseDetail.attachment?.name && (
+                  <p style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
+                    📎 {selectedResponseDetail.attachment.name}
+                  </p>
+                )}
               </div>
 
               {selectedResponseDetail.status === "Answered" && selectedResponseDetail.teacherResponse ? (
