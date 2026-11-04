@@ -1,59 +1,37 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TeacherSidebar from "../components/TeacherSidebar";
+import {
+  deletePublishedMaterialFile,
+  getPublishedMaterialFile,
+  savePublishedMaterialFile,
+} from "../utils/publishedMaterials";
 
-const initialMaterials = [
-  {
-    id: 1,
-    title: "Fractions – Chapter 4",
-    subject: "Mathematics",
-    className: "Class 6th",
-    type: "PDF",
-    topic: "Fractions",
-    uploaded: "Today",
-    icon: "📘",
-  },
-  {
-    id: 2,
-    title: "Light and Shadows",
-    subject: "Science",
-    className: "Class 6th",
-    type: "Notes",
-    topic: "Light",
-    uploaded: "Yesterday",
-    icon: "🔬",
-  },
-  {
-    id: 3,
-    title: "English Grammar Basics",
-    subject: "English",
-    className: "Class 6th",
-    type: "PDF",
-    topic: "Grammar",
-    uploaded: "2 days ago",
-    icon: "📕",
-  },
-  {
-    id: 4,
-    title: "Maps and Directions",
-    subject: "Social Studies",
-    className: "Class 6th",
-    type: "Worksheet",
-    topic: "Maps",
-    uploaded: "3 days ago",
-    icon: "🗺️",
-  },
-];
+const materialsStorageKey = "published_teacher_materials";
+const maxMaterialSize = 20 * 1024 * 1024;
 
 export default function NotesMaterials() {
   const navigate = useNavigate();
 
   const [teacher, setTeacher] = useState(null);
-  const [materials, setMaterials] = useState(initialMaterials);
+  const [materials, setMaterials] = useState([]);
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("All Subjects");
   const [type, setType] = useState("All Types");
   const [showUpload, setShowUpload] = useState(false);
+  const [previewMaterial, setPreviewMaterial] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const [newMaterial, setNewMaterial] = useState({
     title: "",
@@ -64,13 +42,13 @@ export default function NotesMaterials() {
   });
 
   useEffect(() => {
-    let savedTeacher = null;
+    let savedTeacher;
 
     try {
       const storedTeacher = localStorage.getItem("current_teacher");
       savedTeacher = storedTeacher ? JSON.parse(storedTeacher) : null;
     } catch {
-      savedTeacher = null;
+      setActionError("Unable to read the saved teacher profile.");
     }
 
     const teacherIsLoggedIn =
@@ -79,10 +57,28 @@ export default function NotesMaterials() {
 
     if (savedTeacher) {
       setTeacher(savedTeacher);
+      try {
+        const savedMaterials = JSON.parse(localStorage.getItem(materialsStorageKey) || "[]");
+        if (!Array.isArray(savedMaterials)) {
+          throw new Error("Published materials must be a list.");
+        }
+        setMaterials(savedMaterials);
+      } catch {
+        setActionError("Unable to load saved materials. The published materials record may be corrupted.");
+      }
     } else if (teacherIsLoggedIn) {
       setTeacher({
         name: localStorage.getItem("teacherName") || "Teacher",
       });
+      try {
+        const savedMaterials = JSON.parse(localStorage.getItem(materialsStorageKey) || "[]");
+        if (!Array.isArray(savedMaterials)) {
+          throw new Error("Published materials must be a list.");
+        }
+        setMaterials(savedMaterials);
+      } catch {
+        setActionError("Unable to load saved materials. The published materials record may be corrupted.");
+      }
     } else {
       navigate("/teacher-login", { replace: true });
     }
@@ -111,21 +107,39 @@ export default function NotesMaterials() {
     return matchesSearch && matchesSubject && matchesType;
   });
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     e.preventDefault();
 
     if (!newMaterial.title.trim()) {
-      alert("Please enter material title.");
+      setFormError("Please enter material title.");
+      return;
+    }
+    if (!selectedFile) {
+      setFormError("Select the PDF or material file you want to publish.");
+      return;
+    }
+    if (selectedFile.size > maxMaterialSize) {
+      setFormError("The material file must be 20 MB or smaller.");
+      return;
+    }
+    if (newMaterial.type === "PDF" && selectedFile.type !== "application/pdf") {
+      setFormError("Choose a PDF file when the material type is PDF.");
       return;
     }
 
+    setIsSaving(true);
+    setFormError("");
+    const materialId = `material-${globalThis.crypto?.randomUUID?.() || Date.now()}`;
     const material = {
-      id: Date.now(),
+      id: materialId,
       title: newMaterial.title.trim(),
       subject: newMaterial.subject,
-      className: "Class 6th",
+      className: `Class ${teacher.class || 6}th`,
       type: newMaterial.type,
       topic: newMaterial.topic.trim() || "General",
+      description: newMaterial.description.trim(),
+      fileName: selectedFile.name,
+      fileType: selectedFile.type || "application/octet-stream",
       uploaded: "Just now",
       icon:
         newMaterial.type === "PDF"
@@ -137,7 +151,21 @@ export default function NotesMaterials() {
               : "📘",
     };
 
-    setMaterials((previousMaterials) => [material, ...previousMaterials]);
+    try {
+      await savePublishedMaterialFile(materialId, selectedFile);
+      const updatedMaterials = [material, ...materials];
+      localStorage.setItem(materialsStorageKey, JSON.stringify(updatedMaterials));
+      setMaterials(updatedMaterials);
+    } catch (error) {
+      try {
+        await deletePublishedMaterialFile(materialId);
+      } catch {
+        // Keep the original save error visible; a partially saved orphan is not listed as published.
+      }
+      setFormError(error.message || "Unable to save the material. Please try again.");
+      setIsSaving(false);
+      return;
+    }
 
     setNewMaterial({
       title: "",
@@ -146,20 +174,70 @@ export default function NotesMaterials() {
       type: "PDF",
       description: "",
     });
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     setShowUpload(false);
+    setIsSaving(false);
     alert("Material published successfully!");
   };
 
-  const deleteMaterial = (id) => {
+  const openMaterial = async (material) => {
+    setActionError("");
+    try {
+      const file = await getPublishedMaterialFile(material.id);
+      if (!file) {
+        throw new Error("The file for this material is not available. Please upload and publish it again.");
+      }
+      const fileUrl = URL.createObjectURL(file);
+      setPreviewMaterial(material);
+      setPreviewUrl(fileUrl);
+    } catch (error) {
+      setActionError(error.message || "Unable to open this material.");
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl("");
+    setPreviewMaterial(null);
+  };
+
+  const downloadMaterial = async (material) => {
+    setActionError("");
+    try {
+      const file = await getPublishedMaterialFile(material.id);
+      if (!file) {
+        throw new Error("The file for this material is not available. Please upload and publish it again.");
+      }
+      const fileUrl = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = fileUrl;
+      link.download = material.fileName || material.title;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
+    } catch (error) {
+      setActionError(error.message || "Unable to download this material.");
+    }
+  };
+
+  const deleteMaterial = async (material) => {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this material?"
     );
 
     if (confirmDelete) {
-      setMaterials((previousMaterials) =>
-        previousMaterials.filter((material) => material.id !== id)
-      );
+      try {
+        const updatedMaterials = materials.filter((item) => item.id !== material.id);
+        localStorage.setItem(materialsStorageKey, JSON.stringify(updatedMaterials));
+        await deletePublishedMaterialFile(material.id);
+        setMaterials(updatedMaterials);
+        setActionError("");
+      } catch (error) {
+        setActionError(error.message || "Unable to delete this material.");
+      }
     }
   };
 
@@ -289,7 +367,10 @@ export default function NotesMaterials() {
             </div>
 
             <button
-              onClick={() => setShowUpload(true)}
+              onClick={() => {
+                setFormError("");
+                setShowUpload(true);
+              }}
               style={{
                 background: "#059669",
                 color: "#fff",
@@ -418,6 +499,11 @@ export default function NotesMaterials() {
               overflowX: "auto",
             }}
           >
+            {actionError && (
+              <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#B91C1C", padding: "12px 16px", borderRadius: 10, fontSize: 13 }}>
+                {actionError}
+              </div>
+            )}
             <div
               style={{
                 padding: "18px 24px",
@@ -518,7 +604,7 @@ export default function NotesMaterials() {
                       </td>
                       <td style={{ ...tableCellStyle, textAlign: "center" }}>
                         <button
-                          onClick={() => alert(`Opening: ${material.title}`)}
+                          onClick={() => openMaterial(material)}
                           style={actionButtonStyle}
                           title="View"
                           aria-label={`View ${material.title}`}
@@ -526,7 +612,7 @@ export default function NotesMaterials() {
                           👁️
                         </button>
                         <button
-                          onClick={() => alert(`Downloading: ${material.title}`)}
+                          onClick={() => downloadMaterial(material)}
                           style={actionButtonStyle}
                           title="Download"
                           aria-label={`Download ${material.title}`}
@@ -534,7 +620,7 @@ export default function NotesMaterials() {
                           ⬇️
                         </button>
                         <button
-                          onClick={() => deleteMaterial(material.id)}
+                          onClick={() => deleteMaterial(material)}
                           style={actionButtonStyle}
                           title="Delete"
                           aria-label={`Delete ${material.title}`}
@@ -699,6 +785,34 @@ export default function NotesMaterials() {
                 />
               </div>
 
+              <div>
+                <label style={formLabelStyle}>PDF / Material File</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={newMaterial.type === "PDF" ? "application/pdf,.pdf" : ".pdf,image/*,video/*"}
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] || null);
+                    setFormError("");
+                  }}
+                  style={{ ...formInputStyle, width: "100%" }}
+                  required
+                />
+                <small style={{ display: "block", color: "#64748B", marginTop: 4 }}>
+                  Required. Maximum file size: 20 MB.
+                </small>
+                {selectedFile && (
+                  <small style={{ display: "block", color: "#047857", marginTop: 4 }}>
+                    Selected: {selectedFile.name}
+                  </small>
+                )}
+              </div>
+              {formError && (
+                <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", color: "#B91C1C", padding: "10px 12px", borderRadius: 8, fontSize: 12 }}>
+                  {formError}
+                </div>
+              )}
+
               <div
                 style={{
                   display: "flex",
@@ -709,7 +823,11 @@ export default function NotesMaterials() {
               >
                 <button
                   type="button"
-                  onClick={() => setShowUpload(false)}
+                  onClick={() => {
+                    setShowUpload(false);
+                    setFormError("");
+                  }}
+                  disabled={isSaving}
                   style={{
                     background: "#E2E8F0",
                     border: "none",
@@ -723,6 +841,7 @@ export default function NotesMaterials() {
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving}
                   style={{
                     background: "#059669",
                     color: "#fff",
@@ -733,10 +852,46 @@ export default function NotesMaterials() {
                     cursor: "pointer",
                   }}
                 >
-                  Upload &amp; Publish ✓
+                  {isSaving ? "Publishing..." : "Upload & Publish ✓"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {previewMaterial && previewUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview ${previewMaterial.title}`}
+          onClick={closePreview}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 12, width: "min(100%, 1000px)", height: "min(90vh, 800px)", display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #E2E8F0" }}>
+              <strong>{previewMaterial.title}</strong>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => downloadMaterial(previewMaterial)} style={{ background: "#059669", color: "#fff", border: 0, borderRadius: 6, padding: "8px 12px", cursor: "pointer" }}>
+                  Download
+                </button>
+                <button type="button" onClick={closePreview} aria-label="Close preview" style={{ background: "#E2E8F0", border: 0, borderRadius: 6, padding: "8px 12px", cursor: "pointer" }}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <iframe title={previewMaterial.title} src={previewUrl} style={{ border: 0, flex: 1, width: "100%" }} />
           </div>
         </div>
       )}

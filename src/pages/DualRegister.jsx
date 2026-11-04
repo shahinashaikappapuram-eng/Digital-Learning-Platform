@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { createAccountId, readAccountRoster } from "../utils/accountAuth";
 
 const isValidPhoneNumber = (phone) => {
   return /^\d{10}$/.test(phone);
@@ -74,9 +75,15 @@ export default function DualRegister() {
       return;
     }
 
-    const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
+    let allStudents;
+    try {
+      allStudents = readAccountRoster("all_students", "student");
+    } catch (error) {
+      setStudentError(error.message);
+      return;
+    }
     const existingUser = allStudents.find(
-      (s) => s.email.trim().toLowerCase() === studentEmail.trim().toLowerCase()
+      (s) => typeof s?.email === "string" && s.email.trim().toLowerCase() === studentEmail.trim().toLowerCase()
     );
 
     if (existingUser) {
@@ -87,7 +94,7 @@ export default function DualRegister() {
     const finalSchool = studentSchoolType === "Other" ? (studentCustomSchool.trim() || "Private School") : studentSchoolType;
 
     const newUser = {
-      id: `STU-${Date.now().toString().slice(-4)}`,
+      id: createAccountId("STU", allStudents),
       name: studentName.trim(),
       email: studentEmail.trim().toLowerCase(),
       phone: studentPhone.trim(),
@@ -104,12 +111,15 @@ export default function DualRegister() {
       recentActivities: []
     };
 
-    allStudents.push(newUser);
-    localStorage.setItem("all_students", JSON.stringify(allStudents));
-    localStorage.setItem("current_user", JSON.stringify(newUser));
-    localStorage.setItem("studentLoggedIn", "true");
-
-    navigate("/student-login");
+    try {
+      allStudents.push(newUser);
+      localStorage.setItem("all_students", JSON.stringify(allStudents));
+      localStorage.setItem("current_user", JSON.stringify(newUser));
+      localStorage.setItem("studentLoggedIn", "true");
+      navigate("/student-dashboard");
+    } catch {
+      setStudentError("Unable to save the student account. Check browser storage and try again.");
+    }
   };
 
   // Teacher Registration Handler
@@ -141,9 +151,15 @@ export default function DualRegister() {
       return;
     }
 
-    const allTeachers = JSON.parse(localStorage.getItem("all_teachers") || "[]");
+    let allTeachers;
+    try {
+      allTeachers = readAccountRoster("all_teachers", "teacher");
+    } catch (error) {
+      setTeacherError(error.message);
+      return;
+    }
     const existingTeacher = allTeachers.find(
-      (t) => t.email.trim().toLowerCase() === teacherEmail.trim().toLowerCase()
+      (t) => typeof t?.email === "string" && t.email.trim().toLowerCase() === teacherEmail.trim().toLowerCase()
     );
 
     if (existingTeacher) {
@@ -154,7 +170,7 @@ export default function DualRegister() {
     const finalSchool = teacherSchoolType === "Other" ? (teacherCustomSchool.trim() || "Private School") : teacherSchoolType;
 
     const newTeacher = {
-      id: `TCH-${Date.now().toString().slice(-4)}`,
+      id: createAccountId("TCH", allTeachers),
       name: teacherName.trim(),
       email: teacherEmail.trim().toLowerCase(),
       phone: teacherPhone.trim(),
@@ -164,12 +180,15 @@ export default function DualRegister() {
       role: "Teacher"
     };
 
-    allTeachers.push(newTeacher);
-    localStorage.setItem("all_teachers", JSON.stringify(allTeachers));
-    localStorage.setItem("current_teacher", JSON.stringify(newTeacher));
-    localStorage.setItem("teacherLoggedIn", "true");
-
-    navigate("/teacher-login");
+    try {
+      allTeachers.push(newTeacher);
+      localStorage.setItem("all_teachers", JSON.stringify(allTeachers));
+      localStorage.setItem("current_teacher", JSON.stringify(newTeacher));
+      localStorage.setItem("teacherLoggedIn", "true");
+      navigate("/teacher-dashboard");
+    } catch {
+      setTeacherError("Unable to save the teacher account. Check browser storage and try again.");
+    }
   };
 
   return (
@@ -215,7 +234,7 @@ export default function DualRegister() {
             </div>
 
             <div>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email / Student ID</label>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email</label>
               <input
                 type="email"
                 value={studentEmail}
@@ -231,6 +250,7 @@ export default function DualRegister() {
                 required
               />
               {studentEmailError && <span style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{studentEmailError}</span>}
+              <span style={{ color: "#64748B", fontSize: "11px", marginTop: "3px", display: "block" }}>A Student ID will be created for you. You can sign in with that ID or this email.</span>
             </div>
 
             <div>
@@ -369,7 +389,7 @@ export default function DualRegister() {
             </div>
 
             <div>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email / Teacher ID</label>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email</label>
               <input
                 type="email"
                 value={teacherEmail}
@@ -385,6 +405,7 @@ export default function DualRegister() {
                 required
               />
               {teacherEmailError && <span style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{teacherEmailError}</span>}
+              <span style={{ color: "#64748B", fontSize: "11px", marginTop: "3px", display: "block" }}>A Teacher ID will be created for you. You can sign in with that ID or this email.</span>
             </div>
 
             <div>

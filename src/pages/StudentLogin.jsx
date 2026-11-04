@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { findAccountByCredentials, readAccountRoster } from "../utils/accountAuth";
 
 export default function StudentLogin() {
   const navigate = useNavigate();
@@ -26,17 +27,24 @@ export default function StudentLogin() {
       return;
     }
 
-    const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
-    const matchedUser = allStudents.find(
-      (s) => s.email.trim().toLowerCase() === studentEmail.trim().toLowerCase() && s.password === studentPassword
-    );
+    let matchedUser;
+    try {
+      matchedUser = findAccountByCredentials(
+        readAccountRoster("all_students", "student"),
+        studentEmail,
+        studentPassword
+      );
+    } catch (error) {
+      setStudentError(error.message);
+      return;
+    }
 
     if (matchedUser) {
       localStorage.setItem("current_user", JSON.stringify(matchedUser));
       localStorage.setItem("studentLoggedIn", "true");
       navigate("/student-dashboard");
     } else {
-      setStudentError("Invalid student email or password.");
+      setStudentError("Invalid student ID/email or password.");
     }
   };
 
@@ -50,17 +58,24 @@ export default function StudentLogin() {
       return;
     }
 
-    const allTeachers = JSON.parse(localStorage.getItem("all_teachers") || "[]");
-    const matchedTeacher = allTeachers.find(
-      (t) => t.email.trim().toLowerCase() === teacherEmail.trim().toLowerCase() && t.password === teacherPassword
-    );
+    let matchedTeacher;
+    try {
+      matchedTeacher = findAccountByCredentials(
+        readAccountRoster("all_teachers", "teacher"),
+        teacherEmail,
+        teacherPassword
+      );
+    } catch (error) {
+      setTeacherError(error.message);
+      return;
+    }
 
     if (matchedTeacher) {
       localStorage.setItem("current_teacher", JSON.stringify(matchedTeacher));
       localStorage.setItem("teacherLoggedIn", "true");
       navigate("/teacher-dashboard");
     } else {
-      setTeacherError("Invalid teacher email or password.");
+      setTeacherError("Invalid teacher ID/email or password.");
     }
   };
 
@@ -88,12 +103,12 @@ export default function StudentLogin() {
 
           <form onSubmit={handleStudentLogin} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email</label>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Student ID or Email</label>
               <input 
-                type="email" 
+                type="text"
                 value={studentEmail} 
                 onChange={(e) => setStudentEmail(e.target.value)} 
-                placeholder="student@example.com" 
+                placeholder="Student ID or email"
                 autoComplete="off"
                 name="unique_student_email_field"
                 style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
@@ -145,12 +160,12 @@ export default function StudentLogin() {
 
           <form onSubmit={handleTeacherLogin} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
-              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Email</label>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "#475569", display: "block", marginBottom: "4px" }}>Teacher ID or Email</label>
               <input 
-                type="email" 
+                type="text"
                 value={teacherEmail} 
                 onChange={(e) => setTeacherEmail(e.target.value)} 
-                placeholder="teacher@example.com" 
+                placeholder="Teacher ID or email"
                 autoComplete="off"
                 name="unique_teacher_email_field"
                 style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
