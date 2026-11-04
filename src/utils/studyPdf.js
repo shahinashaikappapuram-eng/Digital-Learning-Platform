@@ -114,12 +114,26 @@ export const downloadStudyPdf = ({ filename, title, subtitle, metadata, sections
     const lines = wrapText(page.context, text, PAGE_WIDTH - MARGIN * 2 - indent);
     lines.forEach((line) => {
       if (page.y + lineHeight > PAGE_HEIGHT - MARGIN - 40) addPage();
+      if (pages.length > 3) {
+        throw new Error("The study material exceeded the three-page limit.");
+      }
       page.context.font = font;
       page.context.fillStyle = color;
       page.context.fillText(line, MARGIN + indent, page.y);
       page.y += lineHeight;
     });
     page.y += gap;
+  };
+  const writePageHeader = (label) => {
+    page.context.fillStyle = "#1e60f8";
+    page.context.fillRect(MARGIN, page.y, PAGE_WIDTH - MARGIN * 2, 8);
+    page.y += 48;
+    writeLines(label, {
+      font: '700 20px "Nirmala UI", "Segoe UI", sans-serif',
+      color: "#1e60f8",
+      lineHeight: 30,
+      gap: 18
+    });
   };
 
   page.context.fillStyle = "#1e60f8";
@@ -153,7 +167,11 @@ export const downloadStudyPdf = ({ filename, title, subtitle, metadata, sections
   });
   page.y += 24;
 
-  sections.forEach(({ heading, content }) => {
+  sections.forEach(({ heading, content, pageBreakBefore }) => {
+    if (pageBreakBefore) {
+      addPage();
+      writePageHeader("SMART EDUCATION • STUDY MATERIAL");
+    }
     if (page.y > PAGE_HEIGHT - MARGIN - 130) addPage();
     writeLines(heading, {
       font: '700 25px "Nirmala UI", "Segoe UI", sans-serif',

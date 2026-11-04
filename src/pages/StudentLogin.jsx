@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { findAccountByCredentials, readAccountRoster } from "../utils/accountAuth";
 
 export default function StudentLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Student State - explicitly initialized as empty strings
   const [studentEmail, setStudentEmail] = useState("");
@@ -87,6 +88,11 @@ export default function StudentLogin() {
         <div style={{ fontSize: "36px", marginBottom: "8px" }}>🎓</div>
         <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#0F172A", marginBottom: "4px" }}>Digital Learning Platform</h1>
         <p style={{ fontSize: "13.5px", color: "#64748B" }}>Select your portal to sign in</p>
+        {location.state?.registrationMessage && (
+          <div role="status" style={{ maxWidth: 560, margin: "14px auto 0", background: "#DCFCE7", color: "#166534", border: "1px solid #86EFAC", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>
+            {location.state.registrationMessage}
+          </div>
+        )}
       </div>
 
       {/* Side-by-Side Container */}

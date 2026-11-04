@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import StudentSidebar from "../components/StudentSidebar";
 import { useNavigate } from "react-router-dom";
 import { downloadStudyPdf } from "../utils/studyPdf";
+import { buildStudyPdfSections } from "../utils/studyPdfContent";
 
 export default function Notes() {
   const navigate = useNavigate();
@@ -347,7 +348,11 @@ export default function Notes() {
           { label: "Student", value: studentName },
           { label: "School", value: schoolName }
         ],
-        sections: [{ heading: "Study notes", content: note.details }]
+        sections: buildStudyPdfSections({
+          subject: note.subject,
+          title: note.title,
+          summary: note.details
+        })
       });
     } catch (error) {
       console.error("Could not create study notes PDF", error);

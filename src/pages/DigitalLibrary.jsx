@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import StudentSidebar from "../components/StudentSidebar";
 import { useNavigate } from "react-router-dom";
 import { downloadStudyPdf } from "../utils/studyPdf";
+import { buildStudyPdfSections } from "../utils/studyPdfContent";
 
 export default function DigitalLibrary() {
   const navigate = useNavigate();
@@ -319,7 +320,11 @@ export default function DigitalLibrary() {
           { label: "School", value: schoolName },
           { label: "Date", value: new Date().toLocaleDateString("en-GB") }
         ],
-        sections: [{ heading: "Subject content", content: resource.content }]
+        sections: buildStudyPdfSections({
+          subject: resource.subject,
+          title: resource.title,
+          summary: resource.content
+        })
       });
     } catch (error) {
       console.error("Could not create Digital Library PDF", error);

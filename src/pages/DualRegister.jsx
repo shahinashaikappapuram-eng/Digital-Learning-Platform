@@ -114,9 +114,13 @@ export default function DualRegister() {
     try {
       allStudents.push(newUser);
       localStorage.setItem("all_students", JSON.stringify(allStudents));
-      localStorage.setItem("current_user", JSON.stringify(newUser));
-      localStorage.setItem("studentLoggedIn", "true");
-      navigate("/student-dashboard");
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("current_teacher");
+      localStorage.removeItem("studentLoggedIn");
+      localStorage.removeItem("teacherLoggedIn");
+      navigate("/student-login", {
+        state: { registrationMessage: "Student account created. Sign in with your Student ID or email." },
+      });
     } catch {
       setStudentError("Unable to save the student account. Check browser storage and try again.");
     }
@@ -183,9 +187,13 @@ export default function DualRegister() {
     try {
       allTeachers.push(newTeacher);
       localStorage.setItem("all_teachers", JSON.stringify(allTeachers));
-      localStorage.setItem("current_teacher", JSON.stringify(newTeacher));
-      localStorage.setItem("teacherLoggedIn", "true");
-      navigate("/teacher-dashboard");
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("current_teacher");
+      localStorage.removeItem("studentLoggedIn");
+      localStorage.removeItem("teacherLoggedIn");
+      navigate("/teacher-login", {
+        state: { registrationMessage: "Teacher account created. Sign in with your Teacher ID or email." },
+      });
     } catch {
       setTeacherError("Unable to save the teacher account. Check browser storage and try again.");
     }
