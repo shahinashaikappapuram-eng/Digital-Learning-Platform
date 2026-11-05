@@ -1419,22 +1419,23 @@ export default function MyCourses() {
       <style>{`
         .ps-root { display: flex; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #F8FAFC; color: #0F172A; width: 100%; }
         .ps-root * { box-sizing: border-box; margin: 0; padding: 0; }
-        .ps-sidebar { width: 240px; background-color: #081B38; color: #94A3B8; display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 0; z-index: 120; }
-        .ps-brand { display: flex; align-items: center; gap: 12px; padding: 22px 20px 18px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
-        .ps-brand-badge { width: 38px; height: 38px; border-radius: 10px; background: #1E60F8; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #ffffff; }
-        .ps-brand-text h2 { font-size: 15px; font-weight: 700; color: #FFFFFF; }
-        .ps-brand-text p { font-size: 12px; color: #60A5FA; }
-        .ps-nav { flex: 1; overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
-        .ps-nav-item { display: flex; align-items: center; justify-content: space-between; width: 100%; background: transparent; border: none; color: #94A3B8; padding: 10px 14px; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: left; }
+        .ps-sidebar { width: 250px; background: linear-gradient(180deg, #061226 0%, #081B38 100%); background-color: #081B38; color: #94A3B8; display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 0; z-index: 120; box-shadow: 6px 0 30px rgba(0,0,0,0.08); }
+        .ps-brand { display: flex; align-items: center; gap: 14px; padding: 24px 20px 20px 22px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        .ps-brand-badge { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, #3B82F6, #1D4ED8); display: flex; align-items: center; justify-content: center; font-size: 22px; color: #ffffff; box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4); }
+        .ps-brand-text h2 { font-size: 15.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.3px; }
+        .ps-brand-text p { font-size: 11.5px; color: #60A5FA; font-weight: 600; margin-top: 2px; }
+        .ps-nav { flex: 1; overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+        .ps-nav-item { display: flex; align-items: center; justify-content: space-between; width: 100%; background: transparent; border: none; color: #94A3B8; padding: 11px 14px; border-radius: 12px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; }
         .ps-nav-item:focus { outline: none; }
         .ps-nav-item:focus-visible { outline: 2px solid #93C5FD; outline-offset: 2px; }
-        .ps-nav-item:hover { background-color: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
-        .ps-nav-item.active { background-color: #1E60F8; color: #FFFFFF; font-weight: 600; }
+        .ps-nav-item:hover { background-color: rgba(255, 255, 255, 0.08); color: #FFFFFF; transform: translateX(3px); }
+        .ps-nav-item.active { background: linear-gradient(135deg, #2563EB, #1D4ED8); color: #FFFFFF; font-weight: 700; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
         .ps-nav-item-left { display: flex; align-items: center; gap: 12px; }
-        .ps-logout-wrap { padding: 14px 14px 18px 14px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
-        .ps-logout-btn { width: 100%; display: flex; align-items: center; gap: 12px; background: transparent; border: none; color: #EF4444; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .ps-logout-wrap { padding: 16px 16px 20px 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+        .ps-logout-btn { width: 100%; display: flex; align-items: center; gap: 12px; background: transparent; border: none; color: #F87171; padding: 11px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .ps-logout-btn:hover { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
 
-        .ps-main { flex: 1; margin-left: 240px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
+        .ps-main { flex: 1; margin-left: 250px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
         .ps-header { position: sticky; top: 0; z-index: 100; background: #FFFFFF; height: 64px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
         .ps-header-left { display: flex; align-items: center; gap: 14px; }
         .ps-hamburger { background: none; border: none; font-size: 22px; cursor: pointer; color: #334155; display: none; }
@@ -1507,6 +1508,7 @@ export default function MyCourses() {
 
         @media (max-width: 1024px) {
           .ps-sidebar { transform: translateX(-100%); }
+          .ps-sidebar.open { transform: translateX(0); }
           .ps-main { margin-left: 0; }
           .ps-hamburger { display: block; }
           .ps-layout-split { grid-template-columns: 1fr; }
@@ -1519,7 +1521,7 @@ export default function MyCourses() {
           <div className="ps-brand-badge">🎓</div>
           <div className="ps-brand-text">
             <h2>Smart Education</h2>
-            <p>Nabha</p>
+            <p>{user.school || "Smart Learning Portal"}</p>
           </div>
         </div>
 
@@ -1594,6 +1596,12 @@ export default function MyCourses() {
             <div className="ps-nav-item-left">
               {renderSvgIcon("bell", 18)}
               <span>Announcements</span>
+            </div>
+          </button>
+          <button onClick={() => navigate("/help-support")} className="ps-nav-item">
+            <div className="ps-nav-item-left">
+              {renderSvgIcon("help-circle", 18)}
+              <span>Help &amp; Support</span>
             </div>
           </button>
           <button onClick={() => navigate("/settings")} className="ps-nav-item">
