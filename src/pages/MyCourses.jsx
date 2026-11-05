@@ -1193,17 +1193,20 @@ export default function MyCourses() {
       };
     });
 
+    const completedUnits = user.completedUnitsByCourse?.[template.id] || [];
+
     return {
       ...template,
       syllabusList,
       subtitle: `${template.chapters} chapters • search for lesson videos`,
-      progress: (user.courseProgressMap && user.courseProgressMap[template.id]) || 0
+      completedUnits,
+      progress: Math.round((completedUnits.length / syllabusList.length) * 100)
     };
   });
 
   const overallProgressPercent = Math.round(
-    Object.values(user.courseProgressMap || {}).reduce((sum, val) => sum + (val || 0), 0) /
-      defaultCourseTemplates.length
+    coursesList.reduce((sum, course) => sum + course.progress, 0) /
+      coursesList.length
   );
 
   const handleOpenYouTubeSearch = (title, topic) => {
@@ -1215,28 +1218,43 @@ export default function MyCourses() {
     );
   };
 
-  const handleMarkLessonCompleted = (courseId, courseTitle) => {
-    const courseProgressMap = user.courseProgressMap || {};
-    const currentProg = Number(courseProgressMap[courseId]) || 0;
-    if (currentProg >= 100) return;
+  const handleMarkLessonCompleted = (courseId, courseTitle, unitName, totalUnits) => {
+    const completedUnitsByCourse = user.completedUnitsByCourse || {};
+    const currentUnits = completedUnitsByCourse[courseId] || [];
+    if (currentUnits.includes(unitName)) return;
 
-    const newProg = Math.min(100, currentProg + 25);
-    const updatedMap = { ...courseProgressMap, [courseId]: newProg };
+    const updatedUnits = [...currentUnits, unitName];
+    const updatedUnitsByCourse = { ...completedUnitsByCourse, [courseId]: updatedUnits };
+    const safeTotalUnits = Math.max(Number(totalUnits) || 1, 1);
+    const newProg = Math.min(100, Math.round((updatedUnits.length / safeTotalUnits) * 100));
+    const completionDate = new Date().toISOString();
+    const courseUnitCompletionDates = user.courseUnitCompletionDates || {};
 
     const updatedUser = {
       ...user,
-      courseProgressMap: updatedMap,
+      courseProgressMap: { ...(user.courseProgressMap || {}), [courseId]: newProg },
+      completedUnitsByCourse: updatedUnitsByCourse,
+      courseUnitCounts: { ...(user.courseUnitCounts || {}), [courseId]: safeTotalUnits },
+      certificatesCount: Object.values(updatedUnitsByCourse)
+        .filter((units) => Array.isArray(units) && units.length > 0).length,
+      courseUnitCompletionDates: {
+        ...courseUnitCompletionDates,
+        [courseId]: {
+          ...(courseUnitCompletionDates[courseId] || {}),
+          [unitName]: completionDate
+        }
+      },
       recentActivities: [
         {
           id: `act-${Date.now()}`,
           type: "Completed",
-          title: `Completed Lesson in ${courseTitle}`,
+          title: `Completed ${unitName} in ${courseTitle}`,
           time: "Just now",
           icon: "✓",
           color: "#10B981",
           matter: {
-            heading: `${courseTitle} Lesson Completed`,
-            summary: `Progress in ${courseTitle} increased to ${newProg}%.`,
+            heading: `${courseTitle} Unit Completed`,
+            summary: `Completed ${updatedUnits.length} of ${safeTotalUnits} units in ${courseTitle}.`,
             score: `Course Progress: ${newProg}%`,
             actionPath: "/courses",
             actionText: "Keep Learning"
@@ -1246,6 +1264,9 @@ export default function MyCourses() {
       ]
     };
 
+    setActiveDetails((current) =>
+      current?.id === courseId ? { ...current, completedUnits: updatedUnits, progress: newProg } : current
+    );
     setUser(updatedUser);
     localStorage.setItem("current_user", JSON.stringify(updatedUser));
     const allStudents = JSON.parse(localStorage.getItem("all_students") || "[]");
@@ -1742,13 +1763,18 @@ export default function MyCourses() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleMarkLessonCompleted(activeHighlightedCourse.id, activeHighlightedCourse.title)}
-                      disabled={activeHighlightedCourse.progress >= 100}
+                      onClick={() => handleMarkLessonCompleted(
+                        activeHighlightedCourse.id,
+                        activeHighlightedCourse.title,
+                        activeHighlightedCourse.currentTopic,
+                        activeHighlightedCourse.syllabusList.length
+                      )}
+                      disabled={activeHighlightedCourse.completedUnits.includes(activeHighlightedCourse.currentTopic)}
                       style={{ background: "#DCFCE7", color: "#15803D", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                     >
-                      {activeHighlightedCourse.progress >= 100
-                        ? "✓ Course Completed"
-                        : "✓ Mark Completed (+25%)"}
+                      {activeHighlightedCourse.completedUnits.includes(activeHighlightedCourse.currentTopic)
+                        ? "✓ Unit Completed"
+                        : "✓ Mark Unit Completed"}
                     </button>
                   </div>
                 </div>
@@ -2072,10 +2098,13 @@ export default function MyCourses() {
                   Links search YouTube for this class and subject. Chapters without a title in the course data are marked below.
                 </p>
                 <ul style={{ paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {activeDetails.syllabusList?.map((ch, idx) => (
+                  {activeDetails.syllabusList?.map((ch, idx) => {
+                    const completedUnits = user.completedUnitsByCourse?.[activeDetails.id] || [];
+                    const isUnitCompleted = completedUnits.includes(ch.name);
+                    return (
                     <li
                       key={idx}
-                      style={{ fontSize: "12.5px", fontWeight: 600 }}
+                      style={{ fontSize: "12.5px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
                     >
                       <a
                         href={ch.searchUrl}
@@ -2085,8 +2114,22 @@ export default function MyCourses() {
                       >
                         {ch.name} ↗
                       </a>
+                      <button
+                        type="button"
+                        disabled={isUnitCompleted}
+                        onClick={() => handleMarkLessonCompleted(
+                          activeDetails.id,
+                          activeDetails.title,
+                          ch.name,
+                          activeDetails.syllabusList.length
+                        )}
+                        style={{ flexShrink: 0, border: "1px solid #bbf7d0", borderRadius: 6, padding: "5px 8px", background: isUnitCompleted ? "#dcfce7" : "#fff", color: "#15803d", fontSize: 10, fontWeight: 700, cursor: isUnitCompleted ? "default" : "pointer" }}
+                      >
+                        {isUnitCompleted ? "✓ Completed" : "Mark complete"}
+                      </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
 
