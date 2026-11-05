@@ -2,6 +2,22 @@ import React, { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { findAccountByCredentials, readAccountRoster } from "../utils/accountAuth";
 
+const isValidEmail = (value) =>
+  /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(value.trim());
+
+const isValidAccountId = (value, prefix) =>
+  new RegExp(`^${prefix}-[A-Za-z0-9-]+$`, "i").test(value.trim());
+
+const getIdentifierError = (value, accountType, prefix) => {
+  const identifier = value.trim();
+  if (!identifier) return `${accountType} ID or email is required.`;
+  if (/^\d+$/.test(identifier)) return "Enter the correct name";
+  if (!isValidEmail(identifier) && !isValidAccountId(identifier, prefix)) {
+    return `Enter a valid ${accountType} ID or email.`;
+  }
+  return "";
+};
+
 export default function StudentLogin() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -11,22 +27,29 @@ export default function StudentLogin() {
   const [studentPassword, setStudentPassword] = useState("");
   const [showStudentPass, setShowStudentPass] = useState(false);
   const [studentError, setStudentError] = useState("");
+  const [studentIdentifierError, setStudentIdentifierError] = useState("");
+  const [studentPasswordError, setStudentPasswordError] = useState("");
 
   // Teacher State - explicitly initialized as empty strings
   const [teacherEmail, setTeacherEmail] = useState("");
   const [teacherPassword, setTeacherPassword] = useState("");
   const [showTeacherPass, setShowTeacherPass] = useState(false);
   const [teacherError, setTeacherError] = useState("");
+  const [teacherIdentifierError, setTeacherIdentifierError] = useState("");
+  const [teacherPasswordError, setTeacherPasswordError] = useState("");
 
   // Student Login Handler
   const handleStudentLogin = (e) => {
     e.preventDefault();
     setStudentError("");
+    const identifierError = getIdentifierError(studentEmail, "student", "STU");
+    const passwordError = studentPassword.length < 8
+      ? "Password must be at least 8 characters"
+      : "";
+    setStudentIdentifierError(identifierError);
+    setStudentPasswordError(passwordError);
 
-    if (studentPassword.length < 8) {
-      setStudentError("your password is too small so try change it");
-      return;
-    }
+    if (identifierError || passwordError) return;
 
     let matchedUser;
     try {
@@ -41,11 +64,13 @@ export default function StudentLogin() {
     }
 
     if (matchedUser) {
+      localStorage.removeItem("current_teacher");
+      localStorage.removeItem("teacherLoggedIn");
       localStorage.setItem("current_user", JSON.stringify(matchedUser));
       localStorage.setItem("studentLoggedIn", "true");
       navigate("/student-dashboard");
     } else {
-      setStudentError("Invalid student ID/email or password.");
+      setStudentPasswordError("Incorrect Student ID/email or password. Check your credentials and try again.");
     }
   };
 
@@ -53,11 +78,14 @@ export default function StudentLogin() {
   const handleTeacherLogin = (e) => {
     e.preventDefault();
     setTeacherError("");
+    const identifierError = getIdentifierError(teacherEmail, "teacher", "TCH");
+    const passwordError = teacherPassword.length < 8
+      ? "Password must be at least 8 characters"
+      : "";
+    setTeacherIdentifierError(identifierError);
+    setTeacherPasswordError(passwordError);
 
-    if (teacherPassword.length < 8) {
-      setTeacherError("your password is too small so try change it");
-      return;
-    }
+    if (identifierError || passwordError) return;
 
     let matchedTeacher;
     try {
@@ -72,11 +100,13 @@ export default function StudentLogin() {
     }
 
     if (matchedTeacher) {
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("studentLoggedIn");
       localStorage.setItem("current_teacher", JSON.stringify(matchedTeacher));
       localStorage.setItem("teacherLoggedIn", "true");
       navigate("/teacher-dashboard");
     } else {
-      setTeacherError("Invalid teacher ID/email or password.");
+      setTeacherPasswordError("Incorrect Teacher ID/email or password. Check your credentials and try again.");
     }
   };
 
@@ -105,7 +135,7 @@ export default function StudentLogin() {
             <p style={{ fontSize: "12px", color: "#64748B" }}>Access your classes and materials</p>
           </div>
 
-          {studentError && <div style={{ background: "#FEE2E2", color: "#DC2626", padding: "10px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px", lineHeight: "1.4" }}>{studentError}</div>}
+          {studentError && <div role="alert" style={{ background: "#FEE2E2", color: "#DC2626", padding: "10px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px", lineHeight: "1.4" }}>{studentError}</div>}
 
           <form onSubmit={handleStudentLogin} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
@@ -113,13 +143,21 @@ export default function StudentLogin() {
               <input 
                 type="text"
                 value={studentEmail} 
-                onChange={(e) => setStudentEmail(e.target.value)} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setStudentEmail(value);
+                  setStudentError("");
+                  setStudentIdentifierError(getIdentifierError(value, "student", "STU"));
+                }}
                 placeholder="Student ID or email"
                 autoComplete="off"
                 name="unique_student_email_field"
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
+                aria-invalid={Boolean(studentIdentifierError)}
+                aria-describedby={studentIdentifierError ? "student-identifier-error" : undefined}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: studentIdentifierError ? "1px solid #DC2626" : "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
                 required 
               />
+              {studentIdentifierError && <span id="student-identifier-error" role="alert" style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{studentIdentifierError}</span>}
             </div>
 
             <div>
@@ -128,11 +166,18 @@ export default function StudentLogin() {
                 <input
                   type={showStudentPass ? "text" : "password"}
                   value={studentPassword}
-                  onChange={(e) => setStudentPassword(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setStudentPassword(value);
+                    setStudentError("");
+                    setStudentPasswordError(value && value.length < 8 ? "Password must be at least 8 characters" : "");
+                  }}
                   placeholder="••••••••"
                   autoComplete="new-password"
                   name="unique_student_password_field"
-                  style={{ width: "100%", padding: "10px", paddingRight: "40px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}
+                  aria-invalid={Boolean(studentPasswordError)}
+                  aria-describedby={studentPasswordError ? "student-password-error" : undefined}
+                  style={{ width: "100%", padding: "10px", paddingRight: "40px", borderRadius: "8px", border: studentPasswordError ? "1px solid #DC2626" : "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}
                   required
                 />
                 <button
@@ -143,6 +188,7 @@ export default function StudentLogin() {
                   {showStudentPass ? "👁️‍🗨️" : "👁️"}
                 </button>
               </div>
+              {studentPasswordError && <span id="student-password-error" role="alert" style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{studentPasswordError}</span>}
             </div>
 
             <button type="submit" style={{ marginTop: "10px", width: "100%", background: "#1E60F8", color: "#FFFFFF", border: "none", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>
@@ -162,7 +208,7 @@ export default function StudentLogin() {
             <p style={{ fontSize: "12px", color: "#64748B" }}>Manage classes and review materials</p>
           </div>
 
-          {teacherError && <div style={{ background: "#FEE2E2", color: "#DC2626", padding: "10px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px", lineHeight: "1.4" }}>{teacherError}</div>}
+          {teacherError && <div role="alert" style={{ background: "#FEE2E2", color: "#DC2626", padding: "10px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px", lineHeight: "1.4" }}>{teacherError}</div>}
 
           <form onSubmit={handleTeacherLogin} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
@@ -170,13 +216,21 @@ export default function StudentLogin() {
               <input 
                 type="text"
                 value={teacherEmail} 
-                onChange={(e) => setTeacherEmail(e.target.value)} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setTeacherEmail(value);
+                  setTeacherError("");
+                  setTeacherIdentifierError(getIdentifierError(value, "teacher", "TCH"));
+                }}
                 placeholder="Teacher ID or email"
                 autoComplete="off"
                 name="unique_teacher_email_field"
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
+                aria-invalid={Boolean(teacherIdentifierError)}
+                aria-describedby={teacherIdentifierError ? "teacher-identifier-error" : undefined}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", border: teacherIdentifierError ? "1px solid #DC2626" : "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} 
                 required 
               />
+              {teacherIdentifierError && <span id="teacher-identifier-error" role="alert" style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{teacherIdentifierError}</span>}
             </div>
 
             <div>
@@ -185,11 +239,18 @@ export default function StudentLogin() {
                 <input
                   type={showTeacherPass ? "text" : "password"}
                   value={teacherPassword}
-                  onChange={(e) => setTeacherPassword(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTeacherPassword(value);
+                    setTeacherError("");
+                    setTeacherPasswordError(value && value.length < 8 ? "Password must be at least 8 characters" : "");
+                  }}
                   placeholder="••••••••"
                   autoComplete="new-password"
                   name="unique_teacher_password_field"
-                  style={{ width: "100%", padding: "10px", paddingRight: "40px", borderRadius: "8px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}
+                  aria-invalid={Boolean(teacherPasswordError)}
+                  aria-describedby={teacherPasswordError ? "teacher-password-error" : undefined}
+                  style={{ width: "100%", padding: "10px", paddingRight: "40px", borderRadius: "8px", border: teacherPasswordError ? "1px solid #DC2626" : "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}
                   required
                 />
                 <button
@@ -200,6 +261,7 @@ export default function StudentLogin() {
                   {showTeacherPass ? "👁️‍🗨️" : "👁️"}
                 </button>
               </div>
+              {teacherPasswordError && <span id="teacher-password-error" role="alert" style={{ color: "#DC2626", fontSize: "11px", marginTop: "3px", display: "block" }}>{teacherPasswordError}</span>}
             </div>
 
             <button type="submit" style={{ marginTop: "10px", width: "100%", background: "#059669", color: "#FFFFFF", border: "none", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>
