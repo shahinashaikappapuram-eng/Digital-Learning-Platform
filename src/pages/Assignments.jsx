@@ -875,7 +875,7 @@ export default function Assignments() {
         .as-logout { margin-top: auto; color: #ef4444 !important; }
 
         /* MAIN CONTENT */
-        .as-main { flex: 1; margin-left: 240px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
+        .as-main { flex: 1; margin-left: 250px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
         .as-header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 100; }
         .as-header-title h2 { font-size: 15.5px; font-weight: 700; color: #0f172a; }
         .as-header-title p { font-size: 11.5px; color: #64748b; }

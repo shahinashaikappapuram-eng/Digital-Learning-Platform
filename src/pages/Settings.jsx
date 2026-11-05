@@ -381,7 +381,7 @@ export default function Settings() {
         .st-logout-wrap { padding: 14px 14px 18px 14px; border-top: 1px solid rgba(255, 255, 255, 0.07); margin-top: auto; }
         .st-logout-btn { width: 100%; display: flex; align-items: center; gap: 12px; background: transparent; border: none; color: #EF4444; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-        .st-main { flex: 1; margin-left: 240px; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 60px; min-width: 0; }
+        .st-main { flex: 1; margin-left: 250px; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 60px; min-width: 0; }
         .st-header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
         .st-header-title h2 { font-size: 15.5px; font-weight: 700; color: #0f172a; }
         .st-header-title p { font-size: 11.5px; color: #64748b; }
@@ -466,7 +466,7 @@ export default function Settings() {
         }
       `}</style>
 
-      {isTeacher ? <TeacherSidebar onLogout={handleLogout} width={240} /> : <StudentSidebar onLogout={handleLogout} />}
+      {isTeacher ? <TeacherSidebar onLogout={handleLogout} width={250} /> : <StudentSidebar onLogout={handleLogout} />}
 
       <main className="st-main">
         <header className="st-header">

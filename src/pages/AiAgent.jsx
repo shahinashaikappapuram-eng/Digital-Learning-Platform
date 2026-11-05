@@ -374,7 +374,7 @@ export default function AiAgent() {
         .ai-logout-wrap { padding: 14px 14px 18px 14px; border-top: 1px solid rgba(255, 255, 255, 0.07); margin-top: auto; }
         .ai-logout-btn { width: 100%; display: flex; align-items: center; gap: 12px; background: transparent; border: none; color: #EF4444; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-        .ai-main { flex: 1; margin-left: 240px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
+        .ai-main { flex: 1; margin-left: 250px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
         .ai-header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; position: sticky; top: 0; z-index: 100; }
         .ai-header-title h2 { font-size: 15.5px; font-weight: 700; color: #0f172a; }
         .ai-header-title p { font-size: 11.5px; color: #64748b; }

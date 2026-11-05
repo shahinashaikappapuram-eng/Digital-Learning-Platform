@@ -379,7 +379,7 @@ export default function Notes() {
         .ps-logout-wrap { padding: 14px 14px 18px 14px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
         .ps-logout-btn { width: 100%; display: flex; align-items: center; gap: 12px; background: transparent; border: none; color: #EF4444; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-        .ps-main { flex: 1; margin-left: 240px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
+        .ps-main { flex: 1; margin-left: 250px; display: flex; flex-direction: column; min-width: 0; padding-bottom: 50px; }
         .ps-header { position: sticky; top: 0; z-index: 100; background: #FFFFFF; height: 64px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
         .ps-header-left { display: flex; align-items: center; gap: 14px; }
         .ps-header-titles h1 { font-size: 15.5px; font-weight: 700; color: #0F172A; }
